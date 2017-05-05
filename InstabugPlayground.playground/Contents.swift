@@ -1,6 +1,21 @@
 import UIKit
 import XCTest
 
+//Added for error handling
+enum JsonStringError: Error {
+    case UnmatchedCase(String)
+    case UnmatchedState(String)
+    case UnmatchedTimeStamp(String)
+    case UnmatchedComment(String)
+}
+// My object of date is between two dates
+extension Date {
+    
+    func isBetweeen(date date1: Date, andDate date2: Date) -> Bool {
+        return date1.timeIntervalSinceReferenceDate > self.timeIntervalSinceReferenceDate && date2.timeIntervalSinceReferenceDate < self.timeIntervalSinceReferenceDate
+    }
+    
+}
 class Bug {
     enum State {
         case open
@@ -12,11 +27,62 @@ class Bug {
     let comment: String
     
     init(state: State, timestamp: Date, comment: String) {
-        // To be implemented
+        // implemented
+        self.state=state
+        self.timestamp=timestamp
+        self.comment=comment
     }
     
     init(jsonString: String) throws {
-        // To be implemented
+        //implemented
+      let jsString = jsonString.components(separatedBy: ",")
+      var cstate :State = .open
+      var ctimestampe:Date=Date()
+      var ccomment:String=""
+      if jsString.count != 3
+      {
+        throw JsonStringError.UnmatchedCase("Un matched case for Json String")
+      }
+      for initializer in jsString
+        {
+
+            if initializer.range(of:"\"state\":") != nil
+            {
+                if initializer.range(of:"open") != nil
+                { cstate = .open }
+                else if initializer.range(of:"closed") != nil
+                { cstate = .closed }
+                else {throw JsonStringError.UnmatchedTimeStamp("Un matched state in Json String")}
+            }
+            else if initializer.range(of:"\"timestamp\":") != nil
+            {
+                let subInit = initializer.replacingOccurrences(
+                    of: "[^\\d+]", with: "", options: NSString.CompareOptions.regularExpression,
+                    range: initializer.startIndex..<initializer.endIndex)
+                if subInit == ""
+                { throw JsonStringError.UnmatchedTimeStamp("Un matched Time Stamp in Json String") }
+                let date = Date(timeIntervalSince1970: Double(subInit)!)
+                ctimestampe=date
+            }
+                
+            else if initializer.range(of:"\"comment\":") != nil
+            {
+                let jsSubString = initializer.components(separatedBy: "\"")
+                if(jsSubString.count > 2)
+                {
+                    ccomment = jsSubString[3]
+                }
+                else
+                {
+                    throw JsonStringError.UnmatchedCase("Un matched comment in Json String")
+
+                }
+            }
+            else { throw JsonStringError.UnmatchedCase("Un matched case for Json String") }
+        }
+        self.state=cstate
+        self.comment=ccomment
+        self.timestamp=ctimestampe
     }
 }
 
@@ -34,7 +100,38 @@ class Application {
     }
     
     func findBugs(state: Bug.State?, timeRange: TimeRange) -> [Bug] {
-        // To be implemented
+        //implemented
+        var tempbugs : [Bug]=[]
+        for bug in self.bugs
+        {
+            if state != nil
+            {
+                if bug.state == state
+                {
+                    switch(timeRange)
+                    {
+                    case .pastDay:
+                        var date24hoursAgo = Date()
+                        date24hoursAgo.addTimeInterval(-1 * (24 * 60 * 60))
+                        if bug.timestamp.isBetweeen(date: Date(),andDate: date24hoursAgo)
+                        {tempbugs.append(bug)}
+                        
+                    case .pastWeek:
+                        var date1WeekAgo = Date()
+                        date1WeekAgo.addTimeInterval(-1 * (7 * 24 * 60 * 60))
+                        if bug.timestamp.isBetweeen(date: Date(),andDate: date1WeekAgo)
+                        {tempbugs.append(bug)}
+
+                    case .pastMonth:
+                        var date1MonthAgo = Date()
+                        date1MonthAgo.addTimeInterval(-1 * (30 * 24 * 60 * 60))
+                        if bug.timestamp.isBetweeen(date: Date(),andDate: date1MonthAgo)
+                        {tempbugs.append(bug)}
+                    }
+                }
+            }
+        }
+        return tempbugs
     }
 }
 
@@ -66,7 +163,6 @@ class UnitTests : XCTestCase {
     
     func testFindClosedBugsInThePastMonth() {
         let bugs = application.findBugs(state: .closed, timeRange: .pastMonth)
-        
         XCTAssertTrue(bugs.count == 1, "Invalid number of bugs")
     }
     
